@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>付款申请自动化 · 独立版（最高安全等级）</title>
+<style>
+  :root{
+    --bg:#0f1419; --panel:#1a2129; --panel2:#222c38; --line:#2c3744;
+    --txt:#e6edf3; --mut:#8b98a5; --acc:#3b82f6; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444;
+    --gold:#f5c542;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,"Segoe UI",Roboto,"Microsoft YaHei",sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+  header{padding:14px 20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;background:var(--panel)}
+  header h1{font-size:16px;margin:0}
+  .badge{font-size:11px;padding:2px 8px;border-radius:10px;background:#3a2a00;color:var(--gold);border:1px solid #5c4400}
+  nav{display:flex;gap:4px;padding:8px 16px;background:var(--panel2);border-bottom:1px solid var(--line);flex-wrap:wrap}
+  nav button{background:transparent;border:1px solid transparent;color:var(--mut);padding:7px 14px;border-radius:7px;cursor:pointer;font-size:13px}
+  nav button.on{background:var(--acc);color:#fff}
+  .wrap{padding:18px 20px;max-width:1100px;margin:0 auto}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+  .card h3{margin:0 0 12px;font-size:14px;display:flex;align-items:center;gap:8px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+  label{display:block;font-size:12px;color:var(--mut);margin-bottom:4px}
+  input,select{background:#0e141a;border:1px solid var(--line);color:var(--txt);padding:8px 10px;border-radius:6px;width:100%;font-size:13px}
+  .col{flex:1;min-width:180px}
+  button.act{background:var(--acc);color:#fff;border:none;padding:9px 16px;border-radius:7px;cursor:pointer;font-size:13px}
+  button.act:disabled{background:#33414f;cursor:not-allowed;color:var(--mut)}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--txt);padding:8px 14px;border-radius:7px;cursor:pointer}
+  .pill{font-size:11px;padding:2px 8px;border-radius:10px;display:inline-block}
+  .pill.ok{background:#062b14;color:var(--ok);border:1px solid #0c4a26}
+  .pill.bad{background:#2b0e0e;color:var(--bad);border:1px solid #4a1212}
+  .pill.warn{background:#2b2206;color:var(--warn);border:1px solid #4a3a0c}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--mut);font-weight:600;font-size:12px}
+  tr.bk{background:#2b0e0e22}
+  .amt{font-variant-numeric:tabular-nums;font-weight:600}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+  .steps{display:flex;gap:6px;margin:0 0 18px;flex-wrap:wrap}
+  .step{font-size:12px;padding:5px 11px;border-radius:20px;background:#0e141a;border:1px solid var(--line);color:var(--mut)}
+  .step.cur{background:var(--acc);color:#fff;border-color:var(--acc)}
+  .step.done{background:#0c3b1e;color:var(--ok);border-color:#0c4a26}
+  .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+  .modal.on{display:flex}
+  .mbox{background:var(--panel);border:1px solid var(--line);border-radius:12px;max-width:560px;width:100%;max-height:90vh;overflow:auto;padding:20px}
+  .lockrow{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px}
+  .lockrow b{color:var(--gold)}
+  .chk{display:flex;gap:8px;align-items:flex-start;margin:10px 0;font-size:13px}
+  .note{font-size:12px;color:var(--mut);line-height:1.6}
+  .red{color:var(--bad)} .grn{color:var(--ok)} .amb{color:var(--warn)}
+  .toast{position:fixed;bottom:20px;right:20px;background:var(--panel2);border:1px solid var(--line);padding:12px 16px;border-radius:8px;font-size:13px;display:none;z-index:60}
+  .toast.on{display:block}
+  .kv{font-size:12px;color:var(--mut)}
+  .seg{display:flex;gap:6px;margin-bottom:12px}
+  .seg button{flex:1;background:#0e141a;border:1px solid var(--line);color:var(--mut);padding:8px;border-radius:7px;cursor:pointer;font-size:12px}
+  .seg button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+</style>
+</head>
+<body>
+<header>
+  <h1>付款申请自动化 · 独立版</h1>
+  <span class="badge">最高安全等级 · 零信任账单 · 四眼复核</span>
+  <span class="kv" style="margin-left:auto" id="who"></span>
+</header>
+<nav>
+  <button class="on" data-tab="dash" onclick="tab('dash')">概览</button>
+  <button data-tab="sup" onclick="tab('sup')">供应商主数据</button>
+  <button data-tab="bill" onclick="tab('bill')">账单录入 / 解析</button>
+  <button data-tab="parse" onclick="tab('parse')">M2 原文解析</button>
+  <button data-tab="queue" onclick="tab('queue')">确认闸门</button>
+  <button data-tab="track" onclick="tab('track')">状态追踪</button>
+</nav>
+<div class="wrap">
+
+  <!-- DASHBOARD -->
+  <div id="dash" class="tab">
+    <div class="steps">
+      <span class="step done">① 主数据</span>
+      <span class="step cur">② 账单解析</span>
+      <span class="step">③ 交叉核对</span>
+      <span class="step">④ 人工确认</span>
+      <span class="step">⑤ 四眼复核</span>
+      <span class="step">⑥ 飞书审批</span>
+    </div>
+    <div class="card">
+      <h3>安全模型（零信任）</h3>
+      <div class="note">
+        • <b>账号 / 币种 / 户名</b> 只从「供应商主数据」取，账单原文只贡献 <b>金额 / 账单号 / 账期</b>。<br>
+        • 账单账号与主数据不一致 → <span class="red">硬拦截</span>，不进确认队列。<br>
+        • 供应商未验证 → <span class="red">禁止生成</span>付款申请。<br>
+        • 三流不一致 → <span class="amb">禁止自动提交</span>，需主管书面特批。<br>
+        • 提交前必须填<span class="grn">独立复核人</span>（≠ 制单人）+ 逐项核对勾选。
+      </div>
+    </div>
+    <div class="row" id="kpi"></div>
+    <div class="card">
+      <h3>待处理申请（含拦截）</h3>
+      <div id="dashQueue"></div>
+    </div>
+  </div>
+
+  <!-- SUPPLIER MASTER -->
+  <div id="sup" class="tab" style="display:none">
+    <div class="card">
+      <h3>供应商主数据 <span class="kv">— 本地存储（localStorage），不接任何外部系统</span></h3>
+      <div class="row">
+        <div class="col"><label>供应商名称（display_name）</label><input id="s_name"></div>
+        <div class="col"><label>别名（逗号分隔，用于模糊匹配）</label><input id="s_alias" placeholder="亚丰物流,亚丰国际"></div>
+      </div>
+      <div class="row">
+        <div class="col"><label>户名（account_name，仅从此处取）</label><input id="s_accname"></div>
+        <div class="col"><label>完整收款账号（本地仅存，不进飞书）</label><input id="s_accno" class="mono"></div>
+        <div class="col"><label>开户行 / 支行</label><input id="s_bank"></div>
+      </div>
+      <div class="row">
+        <div class="col"><label>默认币种</label><select id="s_cur">
+          <option>CNY</option><option>USD</option><option>EUR</option><option>GBP</option><option>HKD</option></select></div>
+        <div class="col"><label>区域</label><select id="s_region"><option value="domestic">境内</option><option value="overseas">境外</option></select></div>
+        <div class="col"><label>我方付款账户</label><select id="s_payer"><option>井太兰（公账）</option><option>利景（公账）</option><option>璞景（仓储）</option></select></div>
+      </div>
+      <div class="row">
+        <div class="col" style="flex:2"><label>关联合同号（三流一致）</label><input id="s_contract"></div>
+        <div class="col"><label>验证状态</label><select id="s_verified"><option value="true">已验证（已人工核对收款账号）</option><option value="false">未验证（禁止生成付款）</option></select></div>
+      </div>
+      <div class="row">
+        <button class="act" onclick="saveSupplier()">保存供应商</button>
+        <button class="ghost" onclick="clearSupForm()">清空</button>
+        <span class="note" style="align-self:center">账号变更走审批：本工具记录 change_log，高危字段不可被账单覆盖。</span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>已建档供应商</h3>
+      <table><thead><tr><th>名称</th><th>户名 / 账号</th><th>币种</th><th>区域</th><th>我方付款户</th><th>验证</th><th></th></tr></thead>
+      <tbody id="supList"></tbody></table>
+    </div>
+  </div>
+
+  <!-- BILL INTAKE -->
+  <div id="bill" class="tab" style="display:none">
+    <div class="card">
+      <h3>账单录入 / 解析 <span class="kv">— 账单只提供可变业务值，账号币种拒绝采用</span></h3>
+      <div class="row">
+        <div class="col"><label>账单供应商名（原文）</label><input id="b_name" placeholder="如：亚丰国际物流"></div>
+        <div class="col"><label>账单号</label><input id="b_no"></div>
+      </div>
+      <div class="row">
+        <div class="col"><label>金额（原币）</label><input id="b_amt" type="number" step="0.01"></div>
+        <div class="col"><label>币种</label><select id="b_cur"><option>CNY</option><option>USD</option><option>EUR</option><option>GBP</option><option>HKD</option></select></div>
+        <div class="col"><label>应付日 / 账期</label><input id="b_due" type="date"></div>
+      </div>
+      <div class="row">
+        <div class="col" style="flex:2"><label>账单原文账号（仅用于交叉核对，不采用）</label><input id="b_accno" class="mono" placeholder="如：8888123412341234"></div>
+        <div class="col"><label>账单原文币种（仅核对）</label><select id="b_cur2"><option>CNY</option><option>USD</option><option>EUR</option><option>GBP</option><option>HKD</option></select></div>
+      </div>
+      <div class="row">
+        <div class="col" style="flex:2"><label>费用说明</label><input id="b_memo"></div>
+        <div class="col"><label>三流关联（物流单号，逗号分隔）</label><input id="b_way" placeholder="选填；空则三流预警"></div>
+      </div>
+      <div class="row">
+        <button class="act" onclick="intakeBill()">解析并生成草稿</button>
+        <span class="note" style="align-self:center">解析即触发 L3 交叉核对：账号/币种/已验证任一不符 → 硬拦截。</span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>解析结果 / 拦截诊断</h3>
+      <div id="billDiag"></div>
+    </div>
+  </div>
+
+  <!-- M2 PARSE -->
+  <div id="parse" class="tab" style="display:none">
+    <div class="card">
+      <h3>M2 原文解析 <span class="kv">— 粘贴账单原文 / 上传 .txt / 一键载入样例，自动抽取字段并跑交叉核对</span></h3>
+      <div class="seg">
+        <button class="on" onclick="loadSample(0)">样例① 亚丰(正常CNY)</button>
+        <button onclick="loadSample(1)">样例② DPEX(账号不符)</button>
+        <button onclick="loadSample(2)">样例③ 云途(缺物流单)</button>
+        <button onclick="loadSample(3)">样例④ 未知供应商</button>
+      </div>
+      <div class="row">
+        <div class="col" style="flex:3"><label>账单原文（支持多张连续粘贴，空行分隔）</label><textarea id="rawText" rows="9" style="width:100%;background:#0e141a;border:1px solid var(--line);color:var(--txt);padding:8px;border-radius:6px;font-family:ui-monospace,monospace;font-size:12px"></textarea></div>
+      </div>
+      <div class="row">
+        <button class="act" onclick="runParse()">解析全部并生成草稿</button>
+        <button class="ghost" onclick="$('rawText').value=''">清空</button>
+        <span class="note" style="align-self:center">解析仅抽取 供应商/账单号/金额/币种/账号/账期；账号币种仅核对、不采用。</span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>解析明细 / 抽取审计</h3>
+      <div id="parseOut"></div>
+    </div>
+  </div>
+
+  <!-- CONFIRM QUEUE -->
+  <div id="queue" class="tab" style="display:none">
+    <div class="card">
+      <h3>确认闸门 <span class="kv">— 每笔必须人工点「确认」才放行；拦截单只给处理路径</span></h3>
+      <table><thead><tr><th>申请号</th><th>供应商</th><th>金额(原币)</th><th>折算CNY</th><th>三流</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody id="queueList"></tbody></table>
+    </div>
+  </div>
+
+  <!-- TRACK -->
+  <div id="track" class="tab" style="display:none">
+    <div class="card">
+      <h3>状态追踪 <span class="kv">— 飞书审批实例回写（拉模式）</span></h3>
+      <table><thead><tr><th>申请号</th><th>供应商</th><th>金额</th><th>审批实例</th><th>状态</th></tr></thead>
+      <tbody id="trackList"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- FOUR-EYES MODAL -->
+<div class="modal" id="fourModal">
+  <div class="mbox">
+    <h3 style="margin-top:0">四眼复核 · 最终核对单 <span class="badge">锁定</span></h3>
+    <div id="fourBody"></div>
+    <div class="chk"><input type="checkbox" id="fourChk"><label for="fourChk">本人已逐项核对：收款账号来自主数据[已验证]✓、币种一致、金额无误、三流关联正确。</label></div>
+    <div class="row">
+      <div class="col"><label>复核人（≠ 制单人）</label><input id="fourReviewer" placeholder="如：财务主管李"></div>
+    </div>
+    <div class="row" style="justify-content:flex-end">
+      <button class="ghost" onclick="closeFour()">取消</button>
+      <button class="act" id="fourSubmit" disabled onclick="submitApproval()">提交飞书审批</button>
+    </div>
+    <div class="note">本工具为独立原型：真实提交走已验证的 <span class="mono">lark-cli approval instances create</span>（我们已实测通过，返回 instance_code）。此处模拟生成实例号并写入状态追踪。</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const WHO="马金火（制单人）";
+document.getElementById('who').textContent="制单人："+WHO;
+const FX={"CNY":1,"USD":7.20,"EUR":7.85,"GBP":9.10,"HKD":0.92};
+const $=(id)=>document.getElementById(id);
+function cny(a,c){return (a*FX[c]).toFixed(2);}
+function mask(no){return no.length>8?no.slice(0,4)+"****"+no.slice(-4):no;}
+function toast(m){const t=$("toast");t.textContent=m;t.classList.add("on");setTimeout(()=>t.classList.remove("on"),2600);}
+function load(k,def){try{return JSON.parse(localStorage.getItem(k))||def;}catch(e){return def;}}
+function save(k,v){localStorage.setItem(k,JSON.stringify(v));}
+
+let SUP=load("pay_suppliers",null);
+let DRAFTS=load("pay_drafts",null);
+if(!SUP){SUP=[
+  {id:"SUP-0001",name:"亚丰国际物流有限公司",alias:["亚丰物流","亚丰国际","YF Logistics"],accname:"亚丰国际物流有限公司",accno:"8888123412341234",bank:"招商银行深圳分行",cur:"CNY",region:"domestic",payer:"井太兰（公账）",contract:"HT-YF-2026",verified:true,verified_by:"马金火",verified_at:"2026-09-21",log:[{at:"2026-09-21",by:"马金火",note:"初始建档并验证收款账号"}]},
+  {id:"SUP-0002",name:"DPEX 国际快递",alias:["DPEX","德普士"],accname:"DPEX International",accno:"4567000000000091",bank:"HSBC HK",cur:"USD",region:"overseas",payer:"井太兰（公账）",contract:"HT-DP-2026",verified:true,verified_by:"马金火",verified_at:"2026-09-21",log:[]},
+  {id:"SUP-0003",name:"云途物流",alias:["云途","YunExpress"],accname:"YunExpress Ltd",accno:"6200000000003322",bank:"DBS",cur:"USD",region:"overseas",payer:"利景（公账）",contract:"HT-YT-2026",verified:true,verified_by:"马金火",verified_at:"2026-09-21",log:[]},
+  {id:"SUP-0004",name:"环宇物流",alias:["环宇"],accname:"",accno:"",bank:"",cur:"CNY",region:"domestic",payer:"璞景（仓储）",contract:"",verified:false,verified_by:"",verified_at:"",log:[]}
+];save("pay_suppliers",SUP);}
+if(!DRAFTS){DRAFTS=[];save("pay_drafts",DRAFTS);}
+
+let SEQ=load("pay_seq",5);
+
+// fuzzy match
+function matchSup(name){
+  const q=name.trim().toLowerCase();
+  for(const s of SUP){
+    if(s.name.toLowerCase()===q) return {s,mode:"exact"};
+    if(s.alias.some(a=>a.toLowerCase()===q)) return {s,mode:"alias"};
+    if(s.name.toLowerCase().includes(q)||q.includes(s.name.toLowerCase())) return {s,mode:"partial"};
+    if(s.alias.some(a=>a.toLowerCase().includes(q)||q.includes(a.toLowerCase()))) return {s,mode:"partial"};
+  }
+  return null;
+}
+
+/* ===================== M2 解析引擎 ===================== */
+const SAMPLES=[
+`亚丰国际物流有限公司
+账单号：YF2026-0912
+金额：1,500.00 元
+收款账号：8888123412341234
+账期：2026-09-30
+物流单号：WB-YF-7741`,
+`DPEX International
+INVOICE DP2026-0815
+Total: 2,300.00 USD
+Beneficiary Account: 4567000000007788
+Due: 2026-09-25
+Tracking: WB-881`,
+`云途物流 YunExpress
+账单号 YT2026-0901
+金额 880.00 美元
+收款账号 6200000000003322
+应付日 2026-09-28`,
+`SpeedLine 速达物流
+账单号 SD2026-0520
+金额 1,200.00 CNY
+收款账号 6222000000001111`
+];
+function loadSample(i){$("rawText").value=SAMPLES[i]||"";}
+
+function parseOne(t){
+  const r={supName:"",billNo:"",amt:"",cur:"CNY",acc:"",due:"",way:[]};
+  // supplier: scan known names/aliases
+  const allNames=[]; SUP.forEach(s=>{allNames.push(s.name);s.alias.forEach(a=>allNames.push(a));});
+  const lower=t.toLowerCase();
+  let hit=null;
+  for(const s of SUP){
+    const cand=[s.name,...s.alias];
+    for(const c of cand){ if(lower.includes(c.toLowerCase())){hit=s;break;} }
+    if(hit)break;
+  }
+  r.supName=hit?hit.name:"";
+  // bill no
+  let m=t.match(/(?:账单号|账单号码|单号|INVOICE|INV|BILL)[#:\s：]*([A-Za-z0-9\-]{4,})/i);
+  if(!m){m=t.match(/\b([A-Z]{2}\d{4}[-]\d{3,})\b/);} // e.g. YF2026-0912
+  if(m) r.billNo=m[1];
+  else {const m2=t.match(/\b([A-Za-z0-9]{6,}-[A-Za-z0-9]{3,})\b/); if(m2)r.billNo=m2[1];}
+  // amount
+  let am=t.match(/(?:金额|合计|total|amount|应付|费用)[#:\s：]*[¥$]?\s*([\d,]+\.?\d*)/i);
+  if(!am){am=t.match(/([\d,]+\.\d{2})/);}
+  if(am) r.amt=am[1].replace(/,/g,"");
+  // currency
+  if(/USD|美金|美元/i.test(t)) r.cur="USD";
+  else if(/EUR|欧元/i.test(t)) r.cur="EUR";
+  else if(/GBP|英镑/i.test(t)) r.cur="GBP";
+  else if(/HKD|港币/i.test(t)) r.cur="HKD";
+  else if(/CNY|元|人民币/i.test(t)) r.cur="CNY";
+  // account
+  let ac=t.match(/(?:收款账号|账号|account|beneficiary)[#:\s：]*(\d{6,})/i);
+  if(ac) r.acc=ac[1];
+  // due
+  let du=t.match(/(?:账期|应付日|到期|due)[#:\s：]*(\d{4}[-/]\d{1,2}[-/]\d{1,2})/i);
+  if(du) r.due=du[1].replace(/\//g,"-");
+  // waybill (may multiple)
+  let wb; const re=/(?:物流单号|运单|waybill|tracking)[#:\s：]*([A-Za-z0-9\-]+)/gi;
+  while((wb=re.exec(t))){r.way.push(wb[1]);}
+  return r;
+}
+
+function runParse(){
+  const blocks=$("rawText").value.split(/\n\s*\n/).map(b=>b.trim()).filter(Boolean);
+  if(!blocks.length){toast("请粘贴账单原文或载入样例");return;}
+  const out=[];
+  let idx=0;
+  for(const b of blocks){
+    const r=parseOne(b);
+    // fill form
+    $("b_name").value=r.supName; $("b_no").value=r.billNo;
+    $("b_amt").value=r.amt; $("b_cur").value=r.cur; $("b_cur2").value=r.cur;
+    $("b_due").value=r.due||""; $("b_accno").value=r.acc;
+    $("b_way").value=r.way.join(","); $("b_memo").value="(M2自动解析)";
+    const before=DRAFTS.length;
+    intakeBill();
+    const created=DRAFTS.length>before?DRAFTS[DRAFTS.length-1]:null;
+    out.push({r,created});
+    idx++;
+  }
+  // build audit
+  $("parseOut").innerHTML='<table><thead><tr><th>#</th><th>识别供应商</th><th>账单号</th><th>金额</th><th>币种</th><th>账号(仅核对)</th><th>物流单</th><th>结果</th></tr></thead><tbody>'+
+    out.map((o,i)=>{
+      const c=o.created;
+      let res=c? (c.blocked?'<span class="pill bad">拦截</span>':'<span class="pill ok">草稿</span>') : '<span class="pill warn">未生成</span>';
+      return `<tr><td>${i+1}</td><td>${o.r.supName||'<span class="red">未识别</span>'}</td><td class="mono">${o.r.billNo||'-'}</td><td class="amt">${o.r.amt||'-'} ${o.r.cur}</td><td>${o.r.cur}</td><td class="mono">${o.r.acc?mask(o.r.acc):'-'}</td><td>${o.r.way.join(",")||'<span class="amb">无</span>'}</td><td>${res}</td></tr>`;
+    }).join("")+'</tbody></table><div class="note" style="margin-top:8px">共解析 ${out.length} 张；命中主数据 ${out.filter(o=>o.r.supName).length} 张，未识别 ${out.filter(o=>!o.r.supName).length} 张。账号/币种仅用于交叉核对，未采用。</div>';
+  renderAll();
+  toast("解析完成，见解析明细 / 确认闸门");
+}
+
+function intakeBill(){
+  const name=$("b_name").value.trim();
+  const no=$("b_no").value.trim();
+  const amt=parseFloat($("b_amt").value);
+  const cur=$("b_cur").value;
+  const due=$("b_due").value;
+  const bacc=$("b_accno").value.trim();
+  const bcur=$("b_cur2").value;
+  const memo=$("b_memo").value.trim();
+  const way=($("b_way").value||"").split(",").map(x=>x.trim()).filter(Boolean);
+  if(!name||!no||isNaN(amt)||amt<=0){toast("请填写供应商/账单号/有效金额");return;}
+
+  const m=matchSup(name);
+  const diag=$("billDiag");
+  let reasons=[];
+  let blocked=false;
+  let draft=null;
+
+  if(!m){
+    reasons.push("⛔ 未匹配到供应商主数据 → 需人工匹配，禁止生成");
+    blocked=true;
+    diag.innerHTML=`<div class="card" style="border-color:var(--bad)"><div class="red"><b>硬拦截：</b>账单供应商「${name}」无主数据匹配。</div><div class="note">处理路径：在「供应商主数据」建档并验证后重提；或人工确认张冠李戴风险。</div></div>`;
+  } else {
+    const s=m.s;
+    // L3 cross check
+    if(!s.verified){reasons.push("⛔ 供应商未验证（verified=false）→ 禁止生成付款申请");blocked=true;}
+    if(bacc && s.accno && bacc.replace(/\s/g,"")!==s.accno.replace(/\s/g,"")){
+      reasons.push(`⛔ 账号不一致：账单 ${mask(bacc)} ≠ 主数据 ${mask(s.accno)}`);blocked=true;}
+    if(bcur && bcur!==s.cur){reasons.push(`⛔ 币种不一致：账单 ${bcur} ≠ 主数据 ${s.cur}`);blocked=true;}
+    const threeOk = way.length>0 && s.contract;
+    if(!threeOk){reasons.push("⚠ 三流不一致（缺物流单号或合同）→ 禁止自动提交，需主管书面特批");}
+
+    const id="PA-"+String(++SEQ).padStart(4,"0");
+    draft={
+      id, supId:s.id, supName:s.name, billNo:no,
+      amt, cur, cny:cny(amt,cur), due, memo, way,
+      payeeName:s.accname||"(未填)", payeeAcc:s.accno||"",
+      payer:s.payer, region:s.region,
+      srcAcc:bacc, srcCur:bcur, matchMode:m.mode,
+      threeOk, blocked, reasons, status:"草稿",
+      createdAt:new Date().toISOString(), createdBy:WHO,
+      instanceCode:"", reviewer:""
+    };
+    DRAFTS.push(draft); save("pay_drafts",DRAFTS); save("pay_seq",SEQ);
+
+    let color=blocked?"var(--bad)":(threeOk?"var(--ok)":"var(--warn)");
+    diag.innerHTML=`<div class="card" style="border-color:${color}">
+      <div class="${blocked?'red':'grn'}"><b>匹配：</b>${s.name}（${m.mode}）｜<b>状态：</b>${blocked?'硬拦截':'进入确认闸门'}</div>
+      <div class="lockrow"><span>收款户名（主数据）</span><b>${s.accname||'(空)'}</b></div>
+      <div class="lockrow"><span>收款账号（主数据·本地仅）</span><b class="mono">${s.accno?mask(s.accno):'(空)'}</b></div>
+      <div class="lockrow"><span>账单原文账号</span><span class="mono">${bacc?mask(bacc):'(无)'}</span></div>
+      <div class="lockrow"><span>币种（主数据 / 账单）</span><span>${s.cur} / ${bcur}</span></div>
+      <div class="lockrow"><span>金额</span><span class="amt">${amt} ${cur} ≈ ¥${cny(amt,cur)}</span></div>
+      <div class="lockrow"><span>三流一致</span><span class="${threeOk?'grn':'amb'}">${threeOk?'✓':'✗ 预警'}</span></div>
+      <div style="margin-top:10px">${reasons.map(r=>'<div class="note">'+r+'</div>').join("")}</div>
+      <div style="margin-top:10px">${blocked?'<span class="red">该单被拦截，仅在「确认闸门」显示处理路径。</span>':'<button class="act" onclick="tab(\'queue\')">去确认闸门 →</button>'}</div>
+    </div>`;
+  }
+  renderAll();
+}
+
+function renderDashQueue(){
+  const el=$("dashQueue");
+  if(!DRAFTS.length){el.innerHTML='<div class="note">暂无申请。</div>';return;}
+  el.innerHTML='<table><thead><tr><th>申请号</th><th>供应商</th><th>金额</th><th>状态</th></tr></thead><tbody>'+
+    DRAFTS.slice().reverse().map(d=>`<tr class="${d.blocked?'bk':''}"><td class="mono">${d.id}</td><td>${d.supName}</td><td class="amt">${d.amt} ${d.cur}</td><td>${statusPill(d)}</td></tr>`).join("")+'</tbody></table>';
+}
+function statusPill(d){
+  if(d.blocked) return '<span class="pill bad">硬拦截</span>';
+  if(d.status==="草稿") return '<span class="pill warn">待确认</span>';
+  if(d.status==="审批中") return '<span class="pill ok">审批中</span>';
+  return '<span class="pill ok">'+d.status+'</span>';
+}
+function renderQueue(){
+  const el=$("queueList");
+  if(!DRAFTS.length){el.innerHTML='<tr><td colspan="7" class="note">暂无申请。</td></tr>';return;}
+  el.innerHTML=DRAFTS.slice().reverse().map(d=>{
+    const three=d.threeOk?'<span class="pill ok">一致</span>':'<span class="pill warn">预警</span>';
+    let op;
+    if(d.blocked) op='<span class="red" style="font-size:12px">拦截</span>';
+    else if(d.status==="草稿") op='<button class="act" onclick="openFour(\''+d.id+'\')">确认</button>';
+    else op='<span class="grn" style="font-size:12px">'+d.status+'</span>';
+    return `<tr class="${d.blocked?'bk':''}">
+      <td class="mono">${d.id}</td><td>${d.supName}</td>
+      <td class="amt">${d.amt} ${d.cur}</td><td class="amt">¥${d.cny}</td>
+      <td>${three}</td><td>${statusPill(d)}</td><td>${op}</td></tr>`+
+      (d.blocked?`<tr class="bk"><td colspan="7" class="red" style="font-size:12px">${d.reasons.join("；")}</td></tr>`:"");
+  }).join("");
+}
+function renderTrack(){
+  const el=$("trackList");
+  if(!DRAFTS.length){el.innerHTML='<tr><td colspan="5" class="note">暂无。</td></tr>';return;}
+  el.innerHTML=DRAFTS.slice().reverse().map(d=>`<tr>
+    <td class="mono">${d.id}</td><td>${d.supName}</td><td class="amt">${d.amt} ${d.cur}</td>
+    <td class="mono">${d.instanceCode||'-'}</td><td>${statusPill(d)}</td></tr>`).join("");
+}
+
+let CUR=null;
+function openFour(id){
+  CUR=DRAFTS.find(d=>d.id===id);
+  if(!CUR||CUR.blocked) return;
+  const b=$("fourBody");
+  b.innerHTML=`
+    <div class="lockrow"><span>申请号</span><b class="mono">${CUR.id}</b></div>
+    <div class="lockrow"><span>供应商</span><b>${CUR.supName}</b></div>
+    <div class="lockrow"><span>收款户名 <span class="grn">[主数据·已验证✓]</span></span><b>${CUR.payeeName}</b></div>
+    <div class="lockrow"><span>收款账号 <span class="grn">[主数据·已验证✓]</span></span><b class="mono">${CUR.payeeAcc?mask(CUR.payeeAcc):'(空)'}</b></div>
+    <div class="lockrow"><span>我方付款账户</span><b>${CUR.payer}</b></div>
+    <div class="lockrow"><span>金额（原币 / 折算CNY）</span><b class="amt">${CUR.amt} ${CUR.cur} / ¥${CUR.cny}</b></div>
+    <div class="lockrow"><span>账单号 / 应付日</span><b>${CUR.billNo} / ${CUR.due||'-'}</b></div>
+    <div class="lockrow"><span>三流一致</span><b class="${CUR.threeOk?'grn':'amb'}">${CUR.threeOk?'✓ 一致':'✗ 预警（需特批）'}</b></div>`;
+  $("fourChk").checked=false;$("fourReviewer").value="";
+  $("fourSubmit").disabled=true;
+  $("fourModal").classList.add("on");
+}
+function closeFour(){$("fourModal").classList.remove("on");CUR=null;}
+$("fourChk").onchange=()=>{$("fourSubmit").disabled=!( $("fourChk").checked && $("fourReviewer").value.trim() && $("fourReviewer").value.trim()!==WHO );};
+$("fourReviewer").oninput=()=>{$("fourSubmit").disabled=!( $("fourChk").checked && $("fourReviewer").value.trim() && $("fourReviewer").value.trim()!==WHO );};
+function submitApproval(){
+  if($("fourReviewer").value.trim()===WHO){toast("复核人不能等于制单人");return;}
+  if(!$("fourChk").checked) return;
+  // 模拟飞书提交（真实走 lark-cli，已实测）
+  CUR.status="审批中";
+  CUR.reviewer=$("fourReviewer").value.trim();
+  CUR.instanceCode="6FBA"+Math.random().toString(36).slice(2,10).toUpperCase();
+  CUR.submittedAt=new Date().toISOString();
+  save("pay_drafts",DRAFTS);
+  closeFour();toast("已提交飞书审批，实例号 "+CUR.instanceCode);renderAll();tab('track');
+}
+
+/* supplier master */
+function saveSupplier(){
+  const name=$("s_name").value.trim();
+  if(!name){toast("请填供应商名称");return;}
+  const obj={
+    id:"SUP-"+Date.now().toString().slice(-6),
+    name, alias:($("s_alias").value||"").split(",").map(x=>x.trim()).filter(Boolean),
+    accname:$("s_accname").value.trim(), accno:$("s_accno").value.trim(), bank:$("s_bank").value.trim(),
+    cur:$("s_cur").value, region:$("s_region").value, payer:$("s_payer").value,
+    contract:$("s_contract").value.trim(),
+    verified:$("s_verified").value==="true",
+    verified_by:$("s_verified").value==="true"?WHO:"", verified_at:$("s_verified").value==="true"?"2026-09-21":"",
+    log:[]
+  };
+  SUP.push(obj);save("pay_suppliers",SUP);clearSupForm();renderSup();toast("已保存："+name);
+}
+function clearSupForm(){["s_name","s_alias","s_accname","s_accno","s_bank","s_contract"].forEach(i=>$(i).value="");}
+function renderSup(){
+  const el=$("supList");
+  el.innerHTML=SUP.map(s=>`<tr>
+    <td>${s.name}<div class="kv">${s.alias.join(" / ")}</div></td>
+    <td>${s.accname||'(空)'}<div class="mono kv">${s.accno?mask(s.accno):'(无)'}</div></td>
+    <td>${s.cur}</td><td>${s.region==="domestic"?"境内":"境外"}</td><td>${s.payer}</td>
+    <td>${s.verified?'<span class="pill ok">已验证</span>':'<span class="pill bad">未验证</span>'}</td>
+    <td><button class="ghost" onclick="delSup('${s.id}')">删除</button></td></tr>`).join("");
+}
+function delSup(id){SUP=SUP.filter(s=>s.id!==id);save("pay_suppliers",SUP);renderSup();}
+
+function tab(t){
+  document.querySelectorAll(".tab").forEach(e=>e.style.display="none");
+  document.querySelectorAll("nav button").forEach(b=>b.classList.remove("on"));
+  $(t).style.display="block";
+  document.querySelector(`nav button[data-tab="${t}"]`).classList.add("on");
+  if(t==="sup")renderSup(); if(t==="queue")renderQueue(); if(t==="track")renderTrack(); if(t==="dash")renderDashQueue();
+}
+function renderKPI(){
+  const total=DRAFTS.length, blocked=DRAFTS.filter(d=>d.blocked).length, pend=DRAFTS.filter(d=>d.status==="草稿").length, inapp=DRAFTS.filter(d=>d.status==="审批中").length;
+  const sumPend=DRAFTS.filter(d=>!d.blocked&&d.status==="草稿").reduce((a,d)=>a+parseFloat(d.cny),0);
+  $("kpi").innerHTML=`
+   <div class="card" style="flex:1;margin:0"><h3>总申请</h3><div class="amt" style="font-size:22px">${total}</div></div>
+   <div class="card" style="flex:1;margin:0"><h3 class="red">硬拦截</h3><div class="amt red" style="font-size:22px">${blocked}</div></div>
+   <div class="card" style="flex:1;margin:0"><h3 class="amb">待确认</h3><div class="amt amb" style="font-size:22px">${pend}</div><div class="kv">待付 ¥${sumPend.toFixed(2)}</div></div>
+   <div class="card" style="flex:1;margin:0"><h3 class="grn">审批中</h3><div class="amt grn" style="font-size:22px">${inapp}</div></div>`;
+}
+function renderAll(){renderKPI();renderDashQueue();renderQueue();renderTrack();}
+
+// 预置两笔样例演示拦截（首次打开时）
+if(!load("pay_seeded",false)){
+  DRAFTS.push({id:"PA-0001",supId:"SUP-0002",supName:"DPEX 国际快递",billNo:"DP2026-0815",amt:2300,cur:"USD",cny:cny(2300,"USD"),due:"2026-09-25",memo:"DPEX 8月运费",way:["WB-881"],payeeName:"DPEX International",payeeAcc:"4567000000000091",payer:"井太兰（公账）",region:"overseas",srcAcc:"4567000000007788",srcCur:"USD",matchMode:"exact",threeOk:true,blocked:true,reasons:["⛔ 账号不一致：账单 4567****7788 ≠ 主数据 4567****0091"],status:"草稿",createdAt:"",createdBy:WHO,instanceCode:"",reviewer:""});
+  DRAFTS.push({id:"PA-0002",supId:"SUP-0004",supName:"环宇物流",billNo:"HY2026-0901",amt:880,cur:"CNY",cny:"880.00",due:"2026-09-28",memo:"环宇 9月运费",way:[],payeeName:"",payeeAcc:"",payer:"璞景（仓储）",region:"domestic",srcAcc:"",srcCur:"CNY",matchMode:"exact",threeOk:false,blocked:true,reasons:["⛔ 供应商未验证（verified=false）→ 禁止生成付款申请","⚠ 三流不一致（缺物流单号或合同）"],status:"草稿",createdAt:"",createdBy:WHO,instanceCode:"",reviewer:""});
+  save("pay_drafts",DRAFTS);save("pay_seeded",true);
+}
+
+renderAll();renderSup();
+</script>
+</body>
+</html>
